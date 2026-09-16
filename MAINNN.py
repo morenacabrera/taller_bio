@@ -1,2 +1,1 @@
-x = 'hola'
-print(x)
+"Hola prueba"
