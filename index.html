@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoreo Térmico - Crioterapia Capilar</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #f4f7f6;
+            color: #333;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        /* Estado de Conexión */
+        .estado-header {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 25px;
+            text-transform: uppercase;
+        }
+
+        .conectado {
+            color: #27ae60;
+        }
+
+        .desconectado {
+            color: #e74c3c;
+        }
+
+        /* Layout Grid */
+        .grid-dos-columnas {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background-color: #fafafa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            text-decoration: underline;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+
+        .form-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            font-weight: 600;
+        }
+
+        .form-group input {
+            width: 50%;
+            padding: 6px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        .btn-guardar {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-top: 10px;
+            float: right;
+            transition: background 0.2s;
+        }
+
+        .btn-guardar:hover {
+            background-color: #2980b9;
+        }
+
+        /* Sección de Temperatura y Avisos */
+        .seccion-inferior {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+
+        .temp-display {
+            background-color: #f8f9fa;
+            border: 2px solid #2c3e50;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .temp-titulo {
+            font-size: 1.2rem;
+            font-weight: bold;
+            background-color: #ff007f;
+            color: white;
+            padding: 5px 10px;
+            display: inline-block;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+
+        .temp-valor {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        /* Cuadro de Avisos */
+        .card-avisos {
+            border: 2px solid #2c3e50;
+            border-radius: 8px;
+            padding: 20px;
+            background-color: #fff;
+        }
+
+        .avisos-header {
+            font-size: 1.1rem;
+            font-weight: bold;
+            background-color: #f1c40f;
+            padding: 3px 8px;
+            display: inline-block;
+            margin-bottom: 15px;
+        }
+
+        .alerta-box {
+            border: 2px solid #e74c3c;
+            color: #e74c3c;
+            font-weight: bold;
+            font-size: 1.1rem;
+            text-align: center;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            display: none; /* Oculto hasta que se active */
+        }
+
+        .botones-alerta {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+        }
+
+        .btn-silenciar {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-finalizar {
+            background-color: #c0392b;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-silenciar:hover, .btn-finalizar:hover {
+            opacity: 0.9;
+        }
+
+        .clear {
+            clear: both;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Estado de Conexión -->
+    <div class="estado-header">
+        ESTADO DE CONEXION: <span id="estado-conexion" class="conectado">CONECTADO</span>
+    </div>
+
+    <!-- Primera Fila: Formularios -->
+    <div class="grid-dos-columnas">
+        <!-- Formulario Datos Paciente -->
+        <div class="card">
+            <div class="card-title">INGRESE LOS SIGUIENTES DATOS</div>
+            <div class="form-group">
+                <label for="id-paciente">ID :</label>
+                <input type="text" id="id-paciente" placeholder="Ej: PAC-104">
+            </div>
+            <div class="form-group">
+                <label for="num-sesion">N° de sesión :</label>
+                <input type="number" id="num-sesion" placeholder="Ej: 3">
+            </div>
+            <div class="form-group">
+                <label for="num-gorro">N° de Gorro :</label>
+                <input type="number" id="num-gorro" placeholder="Ej: 8">
+            </div>
+            <button class="btn-guardar" onclick="guardarDatosPaciente()">GUARDAR</button>
+            <div class="clear"></div>
+        </div>
+
+        <!-- Formulario Rango Térmico -->
+        <div class="card">
+            <div class="card-title">INGRESE EL RANGO TERMICO:</div>
+            <div class="form-group">
+                <label for="temp-max">Temp. máx :</label>
+                <input type="number" step="0.1" id="temp-max" placeholder="18.0">
+            </div>
+            <div class="form-group">
+                <label for="temp-min">Temp. mín :</label>
+                <input type="number" step="0.1" id="temp-min" placeholder="10.0">
+            </div>
+            <button class="btn-guardar" onclick="guardarRangoTermico()">GUARDAR</button>
+            <div class="clear"></div>
+        </div>
+    </div>
+
+    <!-- Segunda Fila: Temperatura y Avisos -->
+    <div class="seccion-inferior">
+        <!-- Panel Temperatura Actual -->
+        <div class="temp-display">
+            <div class="temp-titulo">TEMPERATURA ACTUAL :</div>
+            <div class="temp-valor"><span id="val-temperatura">--.-</span> [°C]</div>
+        </div>
+
+        <!-- Panel Avisos -->
+        <div class="card-avisos">
+            <div class="avisos-header">AVISOS :</div>
+            
+            <div id="box-alerta" class="alerta-box">
+                ¡ TEMPERATURA FUERA DE RANGO !
+            </div>
+
+            <div class="botones-alerta">
+                <button class="btn-silenciar" onclick="silenciarAlerta()">SILENCIAR</button>
+                <button class="btn-finalizar" onclick="finalizarTratamiento()">FINALIZAR</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Envio de datos al backend en Python (API REST con Flask)
+    function guardarDatosPaciente() {
+        const id = document.getElementById('id-paciente').value;
+        const sesion = document.getElementById('num-sesion').value;
+        const gorro = document.getElementById('num-gorro').value;
+
+        fetch('/api/registrar_paciente', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({id_paciente: id, num_sesion: sesion, num_gorro: gorro})
+        })
+        .then(res => res.json())
+        .then(data => alert('Datos del paciente guardados en el sistema.'))
+        .catch(err => console.log('Modo visualización (sin backend activo)'));
+    }
+
+    function guardarRangoTermico() {
+        const max = document.getElementById('temp-max').value;
+        const min = document.getElementById('temp-min').value;
+
+        fetch('/api/configurar_umbrales', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({temp_max: max, temp_min: min})
+        })
+        .then(res => res.json())
+        .then(data => alert('Rango térmico configurado.'))
+        .catch(err => console.log('Modo visualización (sin backend activo)'));
+    }
+
+    function silenciarAlerta() {
+        fetch('/api/silenciar', {method: 'POST'})
+        .then(() => alert('Alerta silenciada.'))
+        .catch(err => alert('Botón SILENCIAR presionado.'));
+    }
+
+    function finalizarTratamiento() {
+        fetch('/api/finalizar', {method: 'POST'})
+        .then(() => alert('Tratamiento finalizado.'))
+        .catch(err => alert('Botón FINALIZAR presionado.'));
+    }
+
+    // Consulta periódica para recibir la temperatura desde clase_interfaz.py
+    function actualizarLectura() {
+        fetch('/api/obtener_estado')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('val-temperatura').innerText = data.temp_actual.toFixed(1);
+            
+            // Muestra u oculta el cartel de aviso de alerta
+            const boxAlerta = document.getElementById('box-alerta');
+            if (data.alerta_activa) {
+                boxAlerta.style.display = 'block';
+            } else {
+                boxAlerta.style.display = 'none';
+            }
+        })
+        .catch(() => {
+            // Valor de prueba simulado si abre el HTML directamente sin backend
+            document.getElementById('val-temperatura').innerText = '15.4';
+        });
+    }
+
+    // Actualiza el valor cada 1 segundo (1 Hz)
+    setInterval(actualizarLectura, 200); // Consulta 5 veces por segundo
+</script>
+
+</body>
+</html>
