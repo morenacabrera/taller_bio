@@ -1,68 +1,69 @@
-"""Clase lector"""
+"""Clase Lector"""
 
 import serial
 import time
- 
- 
+
+
 class Lector:
     def __init__(self, puerto, velocidad):
         self.puerto = puerto
         self.velocidad = velocidad
-        self._conexion = None  # acá se guarda el objeto Serial una vez conectado
- 
+        self._conexion = None
+
     def conectar(self):
-        """
-        Abre la conexión serie con el Arduino.
-        Devuelve True si se conectó correctamente, False si hubo un error.
-        """
+        """Abre la conexión serie. Devuelve True si se conectó, False si falló."""
         try:
             self._conexion = serial.Serial(self.puerto, self.velocidad, timeout=1)
-            time.sleep(2)  # el Arduino suele reiniciarse al abrir el puerto; le damos margen
             print(f"Conectado a {self.puerto} a {self.velocidad} baudios.")
             return True
         except serial.SerialException as e:
             print(f"Error al conectar con {self.puerto}: {e}")
+            self._conexion = None
             return False
- 
+
     def leer_temperatura(self):
         """
-        Lee una línea enviada por el Arduino y la interpreta como temperatura.
-        Devuelve el valor como float, o None si la lectura falló o no era válida.
+        Devuelve la última temperatura recibida (float) o None si no hay dato nuevo.
+        Si se pierde la conexión (cable desenchufado) lanza la excepción para que
+        app.py reconecte.
         """
         if self._conexion is None:
             print("No hay conexión activa. Llamá primero a conectar().")
             return None
- 
+
+        linea = None
         try:
-            linea = self._conexion.readline().decode("utf-8").strip()
- 
-            if linea == "":
-                return None  # no llegó nada en este ciclo
- 
-            # Acá se asume que el Arduino manda solo el número, ej: "15.3"
-            # Si más adelante el Arduino manda también el estado de error
-            # (ej: "15.3,OK" o "NAN,ERROR"), esta parte hay que adaptarla.
-            temperatura = float(linea)
-            return temperatura
- 
+            # Si hay varias líneas acumuladas, nos quedamos con la más reciente
+            while self._conexion.in_waiting > 0:
+                linea = self._conexion.readline().decode("utf-8", errors="ignore").strip()
+
+            if linea is None or linea == "":
+                return None
+
+            return float(linea)
+
         except ValueError:
             print(f"Dato inválido recibido: '{linea}'")
             return None
         except serial.SerialException as e:
             print(f"Error de comunicación: {e}")
-            return None
- 
+            raise   # app.py lo captura, cierra y reconecta
+
     def desconectar(self):
-        """Cierra la conexión serie de forma prolija."""
+        """Cierra la conexión serie."""
         if self._conexion is not None:
-            self._conexion.close()
+            try:
+                self._conexion.close()
+            except Exception:
+                pass
+            self._conexion = None
             print("Conexión cerrada.")
- 
- 
-# --- Prueba manual de la clase ---
+
+
+# Prueba manual de la clase
 if __name__ == "__main__":
-    lector = Lector(puerto="COM8", velocidad=9600)  # ajustá el puerto según tu PC
- 
+    lector = Lector(puerto="COM8", velocidad=9600)
+
     if lector.conectar():
         try:
             while True:

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitoreo de gorra</title>
+<style>
+:root{--hielo:#E9F1F3;--panel:#FAFDFD;--tinta:#0F2730;--apagado:#62797F;--linea:#CBDADD;--ok:#1B6E78;--alerta:#D23F2A;--alerta-suave:#F7D9D3}
+*{box-sizing:border-box}
+body{margin:0;background:var(--hielo);color:var(--tinta);font:16px/1.5 "Segoe UI",system-ui,sans-serif}
+main{max-width:980px;margin:0 auto;padding:1.2rem;display:grid;grid-template-columns:1.5fr 1fr;gap:1.2rem}
+@media(max-width:800px){main{grid-template-columns:1fr}}
+h1{font-size:1.2rem;margin:0}
+header{max-width:980px;margin:0 auto;padding:1.2rem 1.2rem 0;display:flex;justify-content:space-between;gap:1rem}
+.conexion{font-weight:600;color:var(--apagado)}.conexion.on{color:var(--ok)}
+.lectura,.caja{background:var(--panel);border:2px solid var(--linea);border-radius:16px;padding:1.5rem}
+.lectura[data-estado=ok]{border-color:var(--ok)}
+.lectura[data-estado=alerta]{background:var(--alerta-suave);border-color:var(--alerta)}
+.temp{font-size:clamp(4.5rem,15vw,8.5rem);font-weight:700;line-height:1;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
+.temp small{font-size:.3em;color:var(--apagado);font-weight:500;letter-spacing:0}
+.lectura[data-estado=ok] .temp{color:var(--ok)}.lectura[data-estado=alerta] .temp{color:var(--alerta)}
+.sub{color:var(--apagado);margin:.3rem 0 0}
+.aviso{margin-top:1.2rem;background:var(--alerta);color:#fff;border-radius:10px;padding:.8rem 1rem;display:flex;justify-content:space-between;align-items:center;gap:1rem}
+.aviso[hidden]{display:none}.aviso p{margin:0;font-weight:600}
+.aviso button{background:#fff;color:var(--alerta)}
+label{display:block;font-size:.9rem;font-weight:500;margin-bottom:.8rem}
+input{width:100%;margin-top:.25rem;padding:.55rem .7rem;border:1px solid var(--linea);border-radius:8px;font:inherit}
+.fila{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
+button{font:inherit;cursor:pointer;border:0;border-radius:9px;padding:.65rem 1rem;font-weight:600;background:var(--tinta);color:#fff;width:100%}
+button.peligro{background:var(--alerta)}
+h2{font-size:1.05rem;margin:0 0 .8rem}
+#msg{min-height:1.3em;font-size:.9rem;margin:.7rem 0 0;color:var(--alerta)}
+:focus-visible{outline:3px solid var(--ok);outline-offset:2px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Monitoreo de temperatura de gorra</h1>
+  <div class="conexion" id="conexion">DESCONECTADO</div>
+</header>
+<main>
+  <section class="lectura" id="lectura" data-estado="reposo" aria-live="polite">
+    <div class="temp"><span id="temp">--.-</span> <small>°C</small></div>
+    <p class="sub" id="sub">Esperando datos del Arduino...</p>
+    <div class="aviso" id="aviso" hidden>
+      <p>Temperatura fuera de rango: revisar la gorra.</p>
+      <button id="btn-silenciar" type="button" style="width:auto">Silenciar</button>
+    </div>
+  </section>
+
+  <aside class="caja">
+    <div id="form">
+      <h2>Iniciar monitoreo</h2>
+      <label>Número de gorra<input id="gorra" type="number" min="1" value="1"></label>
+      <div class="fila">
+        <label>Temp. mínima (°C)<input id="tmin" type="number" step="0.1" value="15"></label>
+        <label>Temp. máxima (°C)<input id="tmax" type="number" step="0.1" value="18"></label>
+      </div>
+      <button id="btn-guardar" type="button">Guardar e iniciar</button>
+    </div>
+    <div id="activo" hidden>
+      <h2>Monitoreo en curso</h2>
+      <p class="sub" id="rango"></p><br>
+      <button class="peligro" id="btn-finalizar" type="button">Finalizar sesión</button>
+    </div>
+    <p id="msg"></p>
+  </aside>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let sonando = 0;
+
+async function post(url, cuerpo) {
+  const r = await fetch(url, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(cuerpo || {})});
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.message || "Error");
+  return d;
+}
+
+function beep() {
+  try {
+    const c = beep.c || (beep.c = new (window.AudioContext || window.webkitAudioContext)());
+    const o = c.createOscillator(), g = c.createGain();
+    o.frequency.value = 880; g.gain.value = 0.08; o.connect(g); g.connect(c.destination);
+    o.start(); o.stop(c.currentTime + 0.25);
+  } catch (e) {}
+}
+
+async function actualizar() {
+  try {
+    const e = await (await fetch("/api/obtener_estado")).json();
+    const on = e.conexion === "CONECTADO";
+    $("conexion").textContent = e.conexion;
+    $("conexion").classList.toggle("on", on);
+
+    // La temperatura se muestra SIEMPRE que haya lectura
+    $("temp").textContent = e.temp_actual == null ? "--.-" : e.temp_actual.toFixed(1);
+    $("sub").textContent = e.temp_actual == null ? "Esperando datos del Arduino..." : (e.monitoreo_activo ? "Monitoreo activo" : "Lectura en vivo (sin monitoreo)");
+
+    $("lectura").dataset.estado = e.alerta_activa ? "alerta" : (e.monitoreo_activo ? "ok" : "reposo");
+    $("aviso").hidden = !e.alerta_activa;
+    if (e.alerta_activa && Date.now() - sonando > 2000) { beep(); sonando = Date.now(); }
+
+    $("form").hidden = e.monitoreo_activo;
+    $("activo").hidden = !e.monitoreo_activo;
+    if (e.monitoreo_activo) $("rango").textContent = `Rango permitido: ${e.umbral_min} a ${e.umbral_max} °C`;
+  } catch (err) {
+    $("conexion").textContent = "SERVIDOR SIN RESPUESTA";
+  }
+}
+
+$("btn-guardar").onclick = async () => {
+  $("msg").textContent = "";
+  try {
+    await post("/api/registrar_gorra", {num_gorro: $("gorra").value});
+    await post("/api/configurar_umbrales", {temp_min: $("tmin").value, temp_max: $("tmax").value});
+    actualizar();
+  } catch (e) { $("msg").textContent = e.message; }
+};
+$("btn-silenciar").onclick = async () => { await post("/api/silenciar"); actualizar(); };
+$("btn-finalizar").onclick = async () => { await post("/api/finalizar"); actualizar(); };
+
+actualizar();
+setInterval(actualizar, 1000);
+</script>
+</body>
+</html>

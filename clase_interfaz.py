@@ -1,119 +1,80 @@
 """
 interfaz.py — Clase Interfaz para el Monitoreo de Crioterapia Capilar.
 
-Esta clase actúa como puente entre la pantalla (GUI) y el resto de las clases del sistema:
-- Monitoreo (para registrar sesión e inicio de tiempo)
-- Gestor_alertas (para configurar umbrales y silenciar)
-- Base_dato (para persistir datos del paciente y eventos)
+Puente entre la pantalla y el resto de las clases:
+- Monitoreo (sesión y tiempos)
+- Gestor_alertas (umbrales y silenciar)
+- Lector (temperatura)
+- Base_dato (pendiente)
 """
 
+
 class Interfaz:
-    def __init__(self, monitoreo=None, gestor_alertas=None, base_dato=None):
-        """
-        Inicializa la interfaz relacionándola con los demás módulos del sistema.
-        Se pueden pasar instancias reales o 'None' (para desarrollo gradual).
-        """
-        # Relaciones según el UML
+    def __init__(self, monitoreo=None, gestor_alertas=None, clase_lector=None):  # base_dato=None)
         self.monitoreo = monitoreo
         self.gestor_alertas = gestor_alertas
-        self.base_dato = base_dato
+        self.clase_lector = clase_lector
+        # self.base_dato = base_dato
 
-        # Atributo definido en el UML
         self.temp_actual: float = 0.0
 
-        # Atributos derivados de la interfaz gráfica dibujada
-        self.id_paciente: str = ""
-        self.num_sesion: int = 0
-        self.num_gorro: int = 0
-        self.temp_min: float = 0.0
-        self.temp_max: float = 0.0
-        self.estado_conexion: str = "DESCONECTADO"
+    def configurar_umbrales(self, temp_min, temp_max):
+        """Pantalla: 'INGRESE EL RANGO TERMICO' -> guarda umbral_min y umbral_max en Gestor_alertas."""
+        temp_min = float(temp_min)
+        temp_max = float(temp_max)
+        if temp_min >= temp_max:
+            raise ValueError("La temperatura mínima debe ser menor que la máxima.")
 
-    # ------------------------------------------------------------------
-    # Métodos del UML y relación con la pantalla
-    # ------------------------------------------------------------------
-
-    def registrar_paciente(self, id_paciente: str, num_sesion: int):
-        """
-        Relacionado con la pantalla: 'INGRESE LOS SIGUIENTES DATOS' -> ID y N° de sesión.
-        Guarda los datos del paciente en la interfaz.
-        """
-        self.id_paciente = str(id_paciente)
-        self.num_sesion = int(num_sesion)
-        print(f"[INTERFAZ] Paciente registrado: ID = {self.id_paciente}, Sesión N° = {self.num_sesion}")
-
-    def registrar_gorra(self, num_gorro: int):
-        """
-        Relacionado con la pantalla: 'N° de Gorro' -> Botón GUARDAR.
-        Conecta con:
-        1. Monitoreo.iniciar_sesion(num_gorra)
-        2. Base_dato.guardar_paciente(...)
-        """
-        self.num_gorro = int(num_gorro)
-        print(f"[INTERFAZ] Gorra N° {self.num_gorro} registrada.")
-
-        # Transmite a la clase Monitoreo si existe
-        if self.monitoreo is not None:
-            self.monitoreo.iniciar_sesion(self.num_gorro)
-
-        # Guarda la ficha del paciente/sesión en la Base de datos si existe
-        if self.base_dato is not None:
-            self.base_dato.guardar_paciente(self.id_paciente, self.num_sesion, self.num_gorro)
-
-    def configurar_umbrales(self, temp_min: float, temp_max: float):
-        """
-        Relacionado con la pantalla: 'INGRESE EL RANGO TERMICO' -> Temp. máx, Temp. mín -> Botón GUARDAR.
-        Conecta con: Gestor_alertas (actualiza umbral_min y umbral_max).
-        """
-        self.temp_min = float(temp_min)
-        self.temp_max = float(temp_max)
-
-        # Transmite los umbrales al Gestor de alertas
         if self.gestor_alertas is not None:
-            self.gestor_alertas.umbral_min = self.temp_min
-            self.gestor_alertas.umbral_max = self.temp_max
+            self.gestor_alertas.umbral_min = temp_min
+            self.gestor_alertas.umbral_max = temp_max
+        print(f"[INTERFAZ] Rango térmico configurado: [{temp_min} °C - {temp_max} °C]")
 
-        print(f"[INTERFAZ] Rango térmico configurado: [{self.temp_min} °C - {self.temp_max} °C]")
+    # def registrar_paciente(self, id_paciente, num_sesion):
+    #     if self.base_dato is not None:
+    #         self.base_dato.guardar_paciente(id_paciente, num_sesion)
+    #     print(f"[INTERFAZ] Paciente registrado: ID = {id_paciente}, Sesión N° = {num_sesion}")
 
-    def mostrar_temp(self, temperatura: float = None):
-        """
-        Relacionado con la pantalla: 'TEMPERATURA ACTUAL: ______ [°C]'.
-        Muestra en pantalla el valor leído en tiempo real desde el Lector.
-        """
-        if temperatura is not None:
-            self.temp_actual = float(temperatura)
-
-        print(f"[PANTALLA] TEMPERATURA ACTUAL: {self.temp_actual:.1f} °C")
-
-    # ------------------------------------------------------------------
-    # Botones de Acción de la pantalla de Avisos
-    # ------------------------------------------------------------------
+    def registrar_gorra(self, num_gorro):
+        """Número de gorra -> Monitoreo (inicia la sesión)."""
+        if self.monitoreo is not None:
+            self.monitoreo.iniciar_sesion(num_gorro)
+            print(f"[INTERFAZ] Gorra N° {num_gorro} registrada.")
 
     def silenciar_alerta(self):
-        """
-        Relacionado con la pantalla: Botón 'SILENCIAR' en el recuadro AVISOS.
-        Conecta con: Gestor_alertas.silenciar_alerta()
-        """
-        print("[INTERFAZ] Botón 'SILENCIAR' presionado.")
+        """Botón 'Silenciar' -> Gestor_alertas."""
+        print("[INTERFAZ] Botón 'Silenciar' presionado.")
         if self.gestor_alertas is not None:
             self.gestor_alertas.silenciar_alerta()
 
-    def finalizar_tratamiento(self):
+    def mostrar_temp(self):
         """
-        Relacionado con la pantalla: Botón 'FINALIZAR' en el recuadro AVISOS.
-        Conecta con: Base_dato.guardar_evento(...) para registrar la salida/cierre.
+        Pantalla: 'TEMPERATURA ACTUAL'. Pide la temperatura al Lector.
+        Devuelve un float, o None si todavía no llegó un dato nuevo del Arduino
+        (en ese caso temp_actual conserva el último valor).
         """
-        print("[INTERFAZ] Botón 'FINALIZAR' presionado. Concluyendo sesión...")
-        if self.base_dato is not None:
-            self.base_dato.guardar_evento(
-                num_gorra=self.num_gorro,
-                temp=self.temp_actual,
-                mensaje="Tratamiento Finalizado por Operador"
-            )
+        if self.clase_lector is None:
+            return None
 
-    def actualizar_estado_conexion(self, conectado: bool):
-        """
-        Relacionado con la pantalla: 'ESTADO DE CONEXION: CONECTADO / DESCONECTADO'.
-        """
-        self.estado_conexion = "CONECTADO" if conectado else "DESCONECTADO"
-        print(f"[PANTALLA] ESTADO DE CONEXIÓN: {self.estado_conexion}")
+        temperatura = self.clase_lector.leer_temperatura()
+        if temperatura is None:
+            return None
+
+        self.temp_actual = float(temperatura)
+        return self.temp_actual
+
+    def finalizar_sesion(self):
+        """Botón 'Finalizar' -> Monitoreo registra tiempo_fin."""
+        print("[INTERFAZ] Botón 'Finalizar' presionado.")
+        if self.monitoreo is not None:
+            self.monitoreo.finalizar_sesion()
+
+
+# --- Prueba manual (sin Arduino) ---
+if __name__ == "__main__":
+    interfaz = Interfaz()
+    interfaz.registrar_gorra(num_gorro=3)
+    interfaz.configurar_umbrales(15, 18)
+    print(interfaz.mostrar_temp())   # None: no hay lector conectado
+    interfaz.silenciar_alerta()
+    interfaz.finalizar_sesion()

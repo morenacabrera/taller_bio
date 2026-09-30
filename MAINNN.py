@@ -11,6 +11,7 @@ descomentando e integrando las partes marcadas con TODO.
 import time
 from clase_lector import Lector
 from clase_interfaz import Interfaz
+import clase_lector
 
 # TODO: Descomentar a medida que implementen las clases faltantes
 # from gestor_alertas import Gestor_alertas
@@ -19,37 +20,38 @@ from clase_interfaz import Interfaz
 
 
 def main():
-    # --- 1. Crear objetos de soporte / referencias vacías por ahora ---
+    #
     gestor = None     # Instancia futura de Gestor_alertas()
     base_dato = None  # Instancia futura de Base_dato()
     monitoreo = None  # Instancia futura de Monitoreo()
 
-    # --- 2. Crear el lector y la interfaz ---
-    lector = Lector(puerto="COM3", velocidad=9600)  # Ajustar el puerto según la PC
-    interfaz = Interfaz(monitoreo=monitoreo, gestor_alertas=gestor, base_dato=base_dato)
+    # Creamos el lector y la interfaz 
+
+    lector = Lector(puerto="COM8", velocidad=9600)  # Ajustar el puerto según la PC
+    interfaz = Interfaz(monitoreo=monitoreo, gestor_alertas=gestor)      #base_dato=base_dato)
 
     # --- 3. Conectar con el Arduino ---
     if not lector.conectar():
-        interfaz.actualizar_estado_conexion(False)
+        #interfaz.actualizar_estado_conexion(False)
         print("No se pudo conectar con el Arduino. Revisá el puerto y el cable.")
         return
 
-    interfaz.actualizar_estado_conexion(True)
+    #interfaz.actualizar_estado_conexion(True)
 
     # --- 4. Carga inicial de datos (Simulación del ingreso en pantalla) ---
     # En una GUI real estos métodos se ejecutan cuando el usuario presiona "GUARDAR"
-    interfaz.registrar_paciente(id_paciente="PAC-104", num_sesion=3)
+    """interfaz.registrar_paciente(id_paciente="PAC-104", num_sesion=3)
     interfaz.registrar_gorra(num_gorro=8)
-    interfaz.configurar_umbrales(temp_min=10.0, temp_max=18.0)
+    interfaz.configurar_umbrales(temp_min=10.0, temp_max=18.0)"""
 
     # --- 5. Ciclo principal de monitoreo ---
     try:
         while True:
-            temperatura = lector.leer_temperatura()
+            temperatura = clase_lector.leer_temperatura()
 
             if temperatura is not None:
                 # Actualiza y muestra la temperatura en la Interfaz
-                interfaz.mostrar_temp(temperatura)
+                interfaz.mostrar_temp()
 
                 # Si el gestor de alertas está disponible, evaluamos
                 if gestor is not None:
@@ -63,7 +65,7 @@ def main():
 
     finally:
         lector.desconectar()
-        interfaz.actualizar_estado_conexion(False)
+        #interfaz.actualizar_estado_conexion(False)
 
 
 if __name__ == "__main__":
