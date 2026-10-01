@@ -89,12 +89,12 @@
             background-color: #3498db;
             color: white;
             border: none;
-            padding: 8px 20px;
+            padding: 10px 25px;
             font-weight: bold;
             border-radius: 4px;
             cursor: pointer;
-            margin-top: 10px;
-            float: right;
+            width: 100%;
+            margin-top: 15px;
             transition: background 0.2s;
         }
 
@@ -161,7 +161,7 @@
             padding: 15px;
             margin-bottom: 15px;
             border-radius: 6px;
-            display: none; /* Oculto hasta que se active */
+            display: none;
         }
 
         .botones-alerta {
@@ -193,10 +193,6 @@
         .btn-silenciar:hover, .btn-finalizar:hover {
             opacity: 0.9;
         }
-
-        .clear {
-            clear: both;
-        }
     </style>
 </head>
 <body>
@@ -204,16 +200,16 @@
 <div class="container">
     <!-- Estado de Conexión -->
     <div class="estado-header">
-        ESTADO DE CONEXION: <span id="estado-conexion" class="conectado">CONECTADO</span>
+        ESTADO DE CONEXION: <span id="estado-conexion" class="desconectado">DESCONECTADO</span>
     </div>
 
     <!-- Primera Fila: Formularios -->
     <div class="grid-dos-columnas">
         <!-- Formulario Datos Paciente -->
         <div class="card">
-            <div class="card-title">INGRESE LOS SIGUIENTES DATOS</div>
+            <div class="card-title">INGRESE LOS DATOS DEL PACIENTE</div>
             <div class="form-group">
-                <label for="id-paciente">ID :</label>
+                <label for="id-paciente">ID del paciente:</label>
                 <input type="text" id="id-paciente" placeholder="Ej: PAC-104">
             </div>
             <div class="form-group">
@@ -224,8 +220,6 @@
                 <label for="num-gorro">N° de Gorro :</label>
                 <input type="number" id="num-gorro" placeholder="Ej: 8">
             </div>
-            <button class="btn-guardar" onclick="guardarDatosPaciente()">GUARDAR</button>
-            <div class="clear"></div>
         </div>
 
         <!-- Formulario Rango Térmico -->
@@ -237,10 +231,9 @@
             </div>
             <div class="form-group">
                 <label for="temp-min">Temp. mín :</label>
-                <input type="number" step="0.1" id="temp-min" placeholder="10.0">
+                <input type="number" step="0.1" id="temp-min" placeholder="15.0">
             </div>
-            <button class="btn-guardar" onclick="guardarRangoTermico()">GUARDAR</button>
-            <div class="clear"></div>
+            <button class="btn-guardar" onclick="guardarTodo()">GUARDAR E INICIAR</button>
         </div>
     </div>
 
@@ -269,71 +262,89 @@
 </div>
 
 <script>
-    // Envio de datos al backend en Python (API REST con Flask)
-    function guardarDatosPaciente() {
-        const id = document.getElementById('id-paciente').value;
-        const sesion = document.getElementById('num-sesion').value;
-        const gorro = document.getElementById('num-gorro').value;
+    function guardarTodo() {
+        const datos = {
+            id_paciente: document.getElementById('id-paciente').value,
+            num_sesion: document.getElementById('num-sesion').value,
+            num_gorro: document.getElementById('num-gorro').value,
+            temp_min: document.getElementById('temp-min').value,
+            temp_max: document.getElementById('temp-max').value
+        };
 
-        fetch('/api/registrar_paciente', {
+        fetch('/api/guardar', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({id_paciente: id, num_sesion: sesion, num_gorro: gorro})
+            body: JSON.stringify(datos)
         })
         .then(res => res.json())
-        .then(data => alert('Datos del paciente guardados en el sistema.'))
-        .catch(err => console.log('Modo visualización (sin backend activo)'));
-    }
-
-    function guardarRangoTermico() {
-        const max = document.getElementById('temp-max').value;
-        const min = document.getElementById('temp-min').value;
-
-        fetch('/api/configurar_umbrales', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({temp_max: max, temp_min: min})
+        .then(data => {
+            if (data.status === "ok") {
+                alert('¡Datos guardados y monitoreo iniciado!');
+            } else {
+                alert('Error: ' + data.message);
+            }
         })
-        .then(res => res.json())
-        .then(data => alert('Rango térmico configurado.'))
-        .catch(err => console.log('Modo visualización (sin backend activo)'));
+        .catch(err => {
+            console.error(err);
+            alert('Error de conexión con el servidor.');
+        });
     }
 
     function silenciarAlerta() {
         fetch('/api/silenciar', {method: 'POST'})
-        .then(() => alert('Alerta silenciada.'))
-        .catch(err => alert('Botón SILENCIAR presionado.'));
+        .catch(err => console.log('Error al silenciar'));
     }
 
     function finalizarTratamiento() {
         fetch('/api/finalizar', {method: 'POST'})
-        .then(() => alert('Tratamiento finalizado.'))
-        .catch(err => alert('Botón FINALIZAR presionado.'));
+        .then(res => res.json())
+        .then(data => {
+            alert('Tratamiento finalizado.');
+            
+            // Limpiar los campos de entrada al finalizar la sesión
+            document.getElementById('id-paciente').value = '';
+            document.getElementById('num-sesion').value = '';
+            document.getElementById('num-gorro').value = '';
+            document.getElementById('temp-max').value = '';
+            document.getElementById('temp-min').value = '';
+        })
+        .catch(err => {
+            // Por si la respuesta no es JSON pero igual finalizó correctamente
+            alert('Tratamiento finalizado.');
+            document.getElementById('id-paciente').value = '';
+            document.getElementById('num-sesion').value = '';
+            document.getElementById('num-gorro').value = '';
+            document.getElementById('temp-max').value = '';
+            document.getElementById('temp-min').value = '';
+        });
     }
 
-    // Consulta periódica para recibir la temperatura desde clase_interfaz.py
     function actualizarLectura() {
         fetch('/api/obtener_estado')
         .then(res => res.json())
         .then(data => {
-            document.getElementById('val-temperatura').innerText = data.temp_actual.toFixed(1);
-            
-            // Muestra u oculta el cartel de aviso de alerta
-            const boxAlerta = document.getElementById('box-alerta');
-            if (data.alerta_activa) {
-                boxAlerta.style.display = 'block';
+            const spanEstado = document.getElementById('estado-conexion');
+            spanEstado.innerText = data.conexion;
+            spanEstado.className = (data.conexion === "CONECTADO") ? "conectado" : "desconectado";
+
+            if (data.monitoreo_activo && data.temp_actual !== null && data.temp_actual !== undefined) {
+                document.getElementById('val-temperatura').innerText = data.temp_actual.toFixed(1);
             } else {
-                boxAlerta.style.display = 'none';
+                document.getElementById('val-temperatura').innerText = "--.-";
             }
+            
+            const boxAlerta = document.getElementById('box-alerta');
+            boxAlerta.style.display = data.alerta_activa ? 'block' : 'none';
         })
         .catch(() => {
-            // Valor de prueba simulado si abre el HTML directamente sin backend
-            document.getElementById('val-temperatura').innerText = '15.4';
+            const spanEstado = document.getElementById('estado-conexion');
+            spanEstado.innerText = "DESCONECTADO";
+            spanEstado.className = "desconectado";
+            document.getElementById('val-temperatura').innerText = "--.-";
         });
     }
 
-    // Actualiza el valor cada 1 segundo (1 Hz)
-    setInterval(actualizarLectura, 200); // Consulta 5 veces por segundo
+    setInterval(actualizarLectura, 1000);
 </script>
 
 </body>

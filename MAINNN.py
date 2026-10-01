@@ -1,57 +1,53 @@
 """
 main.py — Punto de entrada del sistema de monitoreo de temperatura
 del cuero cabelludo durante crioterapia capilar.
-
-Acá se crean los objetos de cada clase y se arranca el ciclo principal
-del programa. A medida que se vayan programando las clases restantes
-(Gestor_alertas, Base_dato, Interfaz, Monitoreo), hay que ir
-descomentando e integrando las partes marcadas con TODO.
 """
 
 import time
 from clase_lector import Lector
 from clase_interfaz import Interfaz
-import clase_lector
 
-# TODO: Descomentar a medida que implementen las clases faltantes
-# from gestor_alertas import Gestor_alertas
-# from base_dato import Base_dato
-# from monitoreo import Monitoreo
-
+# Importación de clases restantes
+from clase_gestor_alertas import Gestor_alertas
+from clase_based_datos import BaseDeDatos
+from Clase_monitoreo import Monitoreo
 
 def main():
-    #
     gestor = None     # Instancia futura de Gestor_alertas()
     base_dato = None  # Instancia futura de Base_dato()
     monitoreo = None  # Instancia futura de Monitoreo()
 
-    # Creamos el lector y la interfaz 
+    # Creamos el lector
+    lector = Lector(puerto="COM3", velocidad=9600)
+    
+    # Creamos la interfaz pasándole el lector para que pueda capturar las temperaturas
+    interfaz = Interfaz(monitoreo=monitoreo, gestor_alertas=gestor, clase_lector=lector)
 
-    lector = Lector(puerto="COM8", velocidad=9600)  # Ajustar el puerto según la PC
-    interfaz = Interfaz(monitoreo=monitoreo, gestor_alertas=gestor)      #base_dato=base_dato)
-
-    # --- 3. Conectar con el Arduino ---
+    # --- 1. Conectar con el Arduino ---
     if not lector.conectar():
-        #interfaz.actualizar_estado_conexion(False)
+        interfaz.actualizar_estado_conexion(False)
         print("No se pudo conectar con el Arduino. Revisá el puerto y el cable.")
         return
 
-    #interfaz.actualizar_estado_conexion(True)
+    interfaz.actualizar_estado_conexion(True)
+    print("Conexión establecida. Esperando a que ingreses los datos y presiones 'Guardar'...")
 
-    # --- 4. Carga inicial de datos (Simulación del ingreso en pantalla) ---
-    # En una GUI real estos métodos se ejecutan cuando el usuario presiona "GUARDAR"
-    """interfaz.registrar_paciente(id_paciente="PAC-104", num_sesion=3)
-    interfaz.registrar_gorra(num_gorro=8)
-    interfaz.configurar_umbrales(temp_min=10.0, temp_max=18.0)"""
+    # --- 2. Pausa de espera hasta que el usuario guarde los datos en la interfaz ---
+    # El programa se queda congelado acá sin leer el sensor ni mostrar nada 
+    # hasta que se toque el botón Guardar (que activa self.datos_guardados = True)
+    while not getattr(interfaz, 'datos_guardados', False):
+        time.sleep(0.5)
 
-    # --- 5. Ciclo principal de monitoreo ---
+    print("¡Datos guardados! Iniciando el monitoreo de temperatura...")
+
+    # --- 3. Ciclo principal de monitoreo ---
     try:
         while True:
-            temperatura = clase_lector.leer_temperatura()
+            # La interfaz se encarga de pedir la temperatura al lector configurado
+            temperatura = interfaz.mostrar_temp()
 
             if temperatura is not None:
-                # Actualiza y muestra la temperatura en la Interfaz
-                interfaz.mostrar_temp()
+                print(f"Temperatura actual: {temperatura:.1f} °C", flush=True)
 
                 # Si el gestor de alertas está disponible, evaluamos
                 if gestor is not None:
@@ -61,11 +57,11 @@ def main():
 
     except KeyboardInterrupt:
         print("\nMonitoreo detenido manualmente.")
-        interfaz.finalizar_tratamiento()
+        interfaz.finalizar_sesion()
 
     finally:
         lector.desconectar()
-        #interfaz.actualizar_estado_conexion(False)
+        interfaz.actualizar_estado_conexion(False)
 
 
 if __name__ == "__main__":
