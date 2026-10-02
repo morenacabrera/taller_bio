@@ -4,7 +4,7 @@ from datetime import datetime
 
 class Monitoreo:
     def __init__(self):
-        self.numero_gorra = None      # (antes: num_gorra; unificado con iniciar_sesion)
+        self.numero_gorra = None     
         self.tiempo_inicio = None
         self.tiempo_fin = None
 
