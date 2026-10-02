@@ -2,7 +2,7 @@ import sqlite3
 from datetime import datetime
 
 class BaseDeDatos:
-    def __init__(self, nombre_db="crioterapia.db"):
+    def __init__(self, nombre_db = "crioterapia.db"):
         self.nombre_db = nombre_db
         self.inicializar_base()
 

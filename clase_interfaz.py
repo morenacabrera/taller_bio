@@ -10,11 +10,10 @@ Puente entre la pantalla y el resto de las clases:
 
 
 class Interfaz:
-    def __init__(self, monitoreo=None, gestor_alertas=None, clase_lector=None):  # base_dato=None)
+    def __init__(self, monitoreo=None, gestor_alertas=None, clase_lector=None):
         self.monitoreo = monitoreo
         self.gestor_alertas = gestor_alertas
         self.clase_lector = clase_lector
-        # self.base_dato = base_dato
         self.estado_conexion: str = "DESCONECTADO"
         self.temp_actual: float = 0.0
 
