@@ -1,6 +1,3 @@
-
-# test_interfaz.py
-
 # Importamos pytest para poder realizar las pruebas
 import pytest
 import sys
