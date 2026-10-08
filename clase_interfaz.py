@@ -87,13 +87,3 @@ class Interfaz:
         print("[INTERFAZ] Botón 'Finalizar' presionado. Concluyendo sesion...")
         if self.monitoreo is not None:
             self.monitoreo.finalizar_sesion()
-
-
-# --- Prueba manual (sin Arduino) ---
-if __name__ == "__main__":
-    interfaz = Interfaz()
-    interfaz.registrar_gorra(num_gorro=3)
-    interfaz.configurar_umbrales(15, 18)
-    print(interfaz.mostrar_temp())   # None: no hay lector conectado
-    interfaz.silenciar_alerta()
-    interfaz.finalizar_sesion()

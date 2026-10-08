@@ -65,19 +65,3 @@ class Lector:
             self._conexion = None
             print("Conexión cerrada.")
 
-
-# Prueba manual de la clase
-if __name__ == "__main__":
-    lector = Lector(puerto="COM3", velocidad=9600)
-
-    if lector.conectar():
-        try:
-            while True:
-                temp = lector.leer_temperatura()
-                if temp is not None:
-                    print(f"Temperatura recibida: {temp} °C")
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("\nDeteniendo lectura...")
-        finally:
-            lector.desconectar()
