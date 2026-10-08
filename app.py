@@ -8,7 +8,7 @@ import time
 from clase_interfaz import Interfaz
 from clase_lector import Lector
 from clase_gestor_alertas import Gestor_alertas
-from Clase_monitoreo import Monitoreo
+from clase_monitoreo import Monitoreo
 from flask import Flask, jsonify, render_template, request
 from clase_based_datos import BaseDeDatos
 from datetime import datetime
@@ -27,12 +27,16 @@ app = Flask(__name__, template_folder=".")
 # Oculta las líneas "GET /api/obtener_estado ..." para que se vea la temperatura en la terminal
 logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
-# --- Configuración de puerto ---
-PUERTO = "COM3"
-VELOCIDAD = 9600
-
 # --- Instancias reales de cada clase ---
-lector = Lector(puerto=PUERTO, velocidad=VELOCIDAD)
+
+# Primero pedir el puerto por consola de manera dinámica al iniciar
+puerto_usuario = input("Ingrese el puerto COM a utilizar (ej. COM3, COM8) [Por defecto COM3]: ").strip()
+if not puerto_usuario:
+    puerto_usuario = "COM3"  # Valor por defecto si apretás Enter sin escribir nada
+
+# Creamos el lector usando la variable ingresada por terminal
+lector = Lector(puerto=puerto_usuario, velocidad=9600)
+
 gestor = Gestor_alertas()
 monitoreo = Monitoreo()
 

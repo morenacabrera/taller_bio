@@ -10,7 +10,7 @@ from clase_interfaz import Interfaz
 # Importación de clases restantes
 from clase_gestor_alertas import Gestor_alertas
 from clase_based_datos import BaseDeDatos
-from Clase_monitoreo import Monitoreo
+from clase_monitoreo import Monitoreo
 
 def main():
     gestor = None     # Instancia futura de Gestor_alertas()
