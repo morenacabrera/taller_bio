@@ -40,17 +40,3 @@ class Gestor_alertas:
         self._silenciada = True
         self.alerta_activa = False
         print("Alerta silenciada. El monitoreo continúa.")
-
-
-# --- Prueba manual de la clase ---
-if __name__ == "__main__":
-    gestor = Gestor_alertas()
-    gestor.umbral_min = 15.0
-    gestor.umbral_max = 18.0
-
-    print(gestor.evaluar_temp(16.5))   # False (dentro de rango)
-    print(gestor.evaluar_temp(9.0))    # True  (muy frío)
-    gestor.silenciar_alerta()
-    print(gestor.evaluar_temp(9.0))    # False (silenciada)
-    print(gestor.evaluar_temp(16.0))   # False (volvió al rango)
-    print(gestor.evaluar_temp(20.0))   # True  (muy caliente, suena de nuevo)
