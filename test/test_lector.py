@@ -4,6 +4,7 @@ import serial
 import pytest
 import sys
 import os
+import unittest
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 # Importamos la clase Lector
@@ -129,3 +130,5 @@ def test_desconectar(mock_serial):
 
     mock_conexion.close.assert_called_once()
     assert lector._conexion is None
+if __name__ == '__main__':
+    unittest.main()
