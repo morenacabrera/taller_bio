@@ -21,14 +21,12 @@ historial_temperaturas = []
 contador_fuera_rango = 0
 contador_silenciadas = 0
 alerta_fuera_rango_previa = False # Para contar cuántas veces entró en alerta
-# Variables globales para ir recolectando las métricas de la sesión
-datos_sesion_actual = {}
-historial_temperaturas = []
-contador_fuera_rango = 0
-contador_silenciadas = 0
-alerta_fuera_rango_previa = False # Para contar cuántas veces entró en alerta
 temp_inicial_sesion = None          
 esperando_temp_inicial = False   
+
+# Variables para registrar valores únicos de temperatura que causaron alerta
+temps_alerta_sesion = []
+entro_al_rango_alguna_vez = False
 
 app = Flask(__name__, template_folder=".")
 
@@ -37,14 +35,11 @@ logging.getLogger("werkzeug").setLevel(logging.ERROR)
 
 # --- Instancias reales de cada clase ---
 
-# Primero pedir el puerto por consola de manera dinámica al iniciar
 puerto_usuario = input("Ingrese el puerto COM a utilizar (ej. COM3, COM8) [Por defecto COM3]: ").strip()
 if not puerto_usuario:
-    puerto_usuario = "COM3"  # Valor por defecto si apretás Enter sin escribir nada
+    puerto_usuario = "COM3"
 
-# Creamos el lector usando la variable ingresada por terminal
 lector = Lector(puerto=puerto_usuario, velocidad=9600)
-
 gestor = Gestor_alertas()
 monitoreo = Monitoreo()
 
@@ -54,11 +49,12 @@ interfaz = Interfaz(monitoreo=monitoreo, gestor_alertas=gestor, clase_lector=lec
 monitoreo_activo = False
 conexion_activa = False
 alerta_activa = False
-temp_actual = None          # última temperatura leída (siempre se actualiza)
+temp_actual = None 
+
 
 def ciclo_monitoreo():
     """Lee el Arduino todo el tiempo. Reconecta solo si se cae."""
-    global monitoreo_activo, conexion_activa, alerta_activa, temp_actual, historial_temperaturas, contador_fuera_rango, alerta_fuera_rango_previa, temp_inicial_sesion, esperando_temp_inicial
+    global monitoreo_activo, conexion_activa, alerta_activa, temp_actual, historial_temperaturas, contador_fuera_rango, alerta_fuera_rango_previa, temp_inicial_sesion, esperando_temp_inicial, temps_alerta_sesion, entro_al_rango_alguna_vez
 
     while True:
         # 1) Conectar (reintenta hasta lograrlo)
@@ -92,7 +88,17 @@ def ciclo_monitoreo():
                     temp_min = datos_sesion_actual.get("temp_min", 0)
                     temp_max = datos_sesion_actual.get("temp_max", 0)
 
-                    fuera_de_rango_ahora = (temp_actual < temp_min or temp_actual > temp_max)
+                    en_rango = (temp_min <= temp_actual <= temp_max)
+                    fuera_de_rango_ahora = not en_rango
+
+                    # Marca si ingresó al rango al menos una vez en la sesión
+                    if en_rango:
+                        entro_al_rango_alguna_vez = True
+
+                    # Si ya ingresó previamente y se sale, registra valores únicos
+                    if entro_al_rango_alguna_vez and fuera_de_rango_ahora:
+                        if temp_actual not in temps_alerta_sesion:
+                            temps_alerta_sesion.append(temp_actual)
 
                     if fuera_de_rango_ahora and not alerta_fuera_rango_previa:
                         contador_fuera_rango += 1
@@ -124,11 +130,7 @@ def home():
 
 @app.route("/api/guardar", methods=["POST"])
 def api_guardar():
-    """
-    Ruta unificada: Al presionar 'Guardar' en la interfaz web, 
-    registra el paciente, la gorra, configura los umbrales y arranca el monitoreo.
-    """
-    global monitoreo_activo, datos_sesion_actual, historial_temperaturas, contador_fuera_rango, contador_silenciadas, alerta_fuera_rango_previa
+    global monitoreo_activo, datos_sesion_actual, historial_temperaturas, contador_fuera_rango, contador_silenciadas, alerta_fuera_rango_previa, esperando_temp_inicial, temps_alerta_sesion, entro_al_rango_alguna_vez
     
     data = request.json
     try:
@@ -147,6 +149,9 @@ def api_guardar():
         contador_fuera_rango = 0
         contador_silenciadas = 0
         alerta_fuera_rango_previa = False
+        esperando_temp_inicial = True
+        temps_alerta_sesion = []
+        entro_al_rango_alguna_vez = False
 
         ahora = datetime.now()
         datos_sesion_actual = {
@@ -178,9 +183,8 @@ def api_silenciar():
     return jsonify({"status": "ok"})
 
 @app.route("/api/finalizar", methods=["POST"])
-@app.route("/api/finalizar", methods=["POST"])
 def api_finalizar():
-    global monitoreo_activo, alerta_activa, datos_sesion_actual, historial_temperaturas, contador_fuera_rango, contador_silenciadas, temp_inicial_sesion, esperando_temp_inicial   # <-- agregadas las dos últimas
+    global monitoreo_activo, alerta_activa, datos_sesion_actual, historial_temperaturas, contador_fuera_rango, contador_silenciadas, temp_inicial_sesion, esperando_temp_inicial, temps_alerta_sesion
 
     monitoreo_activo = False
     esperando_temp_inicial = False   
@@ -198,13 +202,15 @@ def api_finalizar():
 
     # Calcular métricas térmicas de la sesión
     if historial_temperaturas:
-        temp_inicial = temp_inicial_sesion if temp_inicial_sesion is not None else historial_temperaturas[0]   # <-- cambiada
+        temp_inicial = temp_inicial_sesion if temp_inicial_sesion is not None else historial_temperaturas[0]
         temp_final = historial_temperaturas[-1]
         temp_promedio = sum(historial_temperaturas) / len(historial_temperaturas)
     else:
         temp_inicial = 0.0
         temp_final = 0.0
         temp_promedio = 0.0
+
+    cadena_temps_alerta = ", ".join(map(str, temps_alerta_sesion)) if temps_alerta_sesion else "Ninguna"
 
     # Armar el diccionario completo con todas las columnas
     registro_completo = {
@@ -218,6 +224,7 @@ def api_finalizar():
         'temp_promedio': round(temp_promedio, 2),
         'veces_fuera_rango': contador_fuera_rango,
         'alertas_silenciadas': contador_silenciadas,
+        'temperaturas_alerta': cadena_temps_alerta,
         'hora_inicio': datos_sesion_actual.get('hora_inicio', '00:00:00'),
         'hora_fin': hora_fin,
         'fecha': datos_sesion_actual.get('fecha', datetime.now().strftime("%Y-%m-%d"))
