@@ -21,6 +21,14 @@ historial_temperaturas = []
 contador_fuera_rango = 0
 contador_silenciadas = 0
 alerta_fuera_rango_previa = False # Para contar cuántas veces entró en alerta
+# Variables globales para ir recolectando las métricas de la sesión
+datos_sesion_actual = {}
+historial_temperaturas = []
+contador_fuera_rango = 0
+contador_silenciadas = 0
+alerta_fuera_rango_previa = False # Para contar cuántas veces entró en alerta
+temp_inicial_sesion = None          
+esperando_temp_inicial = False   
 
 app = Flask(__name__, template_folder=".")
 
@@ -50,7 +58,7 @@ temp_actual = None          # última temperatura leída (siempre se actualiza)
 
 def ciclo_monitoreo():
     """Lee el Arduino todo el tiempo. Reconecta solo si se cae."""
-    global monitoreo_activo, conexion_activa, alerta_activa, temp_actual, historial_temperaturas, contador_fuera_rango, alerta_fuera_rango_previa
+    global monitoreo_activo, conexion_activa, alerta_activa, temp_actual, historial_temperaturas, contador_fuera_rango, alerta_fuera_rango_previa, temp_inicial_sesion, esperando_temp_inicial
 
     while True:
         # 1) Conectar (reintenta hasta lograrlo)
@@ -63,35 +71,34 @@ def ciclo_monitoreo():
         # 2) Ciclo de lectura y control
         try:
             while True:
-                temp = interfaz.mostrar_temp()   # Lee el dato del puerto serie
+                temp = interfaz.mostrar_temp()   # <-- PRIMERO se lee, siempre
 
-                # 🛑 SI EL MONITOREO NO ESTÁ ACTIVO (Aún no se presionó "Guardar"):
                 if not monitoreo_activo:
                     alerta_activa = False
                     time.sleep(1)
-                    continue  # Salta a la siguiente vuelta sin procesar
+                    continue
 
-                # ✅ SI EL MONITOREO ESTÁ ACTIVO:
                 if temp is not None:
                     temp_actual = temp
                     print(f"Temperatura: {temp:.1f} °C", flush=True)
 
-                    # --- REGISTRO PARA LA BASE DE DATOS ---
+                    # Captura de la temperatura inicial (primera lectura tras Guardar)
+                    if esperando_temp_inicial:
+                        temp_inicial_sesion = temp
+                        esperando_temp_inicial = False
+
                     historial_temperaturas.append(temp_actual)
-                    
-                    # Comprobar si está fuera de rango para sumar al contador
+
                     temp_min = datos_sesion_actual.get("temp_min", 0)
                     temp_max = datos_sesion_actual.get("temp_max", 0)
-                    
+
                     fuera_de_rango_ahora = (temp_actual < temp_min or temp_actual > temp_max)
-                    
-                    # Si antes estaba bien y ahora está fuera de rango, sumamos 1 vez que se salió
+
                     if fuera_de_rango_ahora and not alerta_fuera_rango_previa:
                         contador_fuera_rango += 1
-                        
+
                     alerta_fuera_rango_previa = fuera_de_rango_ahora
 
-                # Evaluar alertas de forma segura
                 if temp_actual is not None:
                     try:
                         alerta_activa = gestor.evaluar_temp(temp_actual)
@@ -100,7 +107,7 @@ def ciclo_monitoreo():
                 else:
                     alerta_activa = False
 
-                time.sleep(1)  # muestreo a 1 Hz
+                time.sleep(1)
 
         except Exception as e:
             print(f"Error en ciclo de monitoreo: {e}")
@@ -108,7 +115,7 @@ def ciclo_monitoreo():
             lector.desconectar()
             conexion_activa = False
             temp_actual = None
-        time.sleep(3)  # espera antes de reconectar
+        time.sleep(3)
 
 # --- Rutas de la API ---
 @app.route("/")
@@ -171,25 +178,27 @@ def api_silenciar():
     return jsonify({"status": "ok"})
 
 @app.route("/api/finalizar", methods=["POST"])
+@app.route("/api/finalizar", methods=["POST"])
 def api_finalizar():
-    global monitoreo_activo, alerta_activa, datos_sesion_actual, historial_temperaturas, contador_fuera_rango, contador_silenciadas
-    
+    global monitoreo_activo, alerta_activa, datos_sesion_actual, historial_temperaturas, contador_fuera_rango, contador_silenciadas, temp_inicial_sesion, esperando_temp_inicial   # <-- agregadas las dos últimas
+
     monitoreo_activo = False
+    esperando_temp_inicial = False   
     alerta_activa = False
-    
+
     interfaz.finalizar_sesion()
-    
+
     if interfaz.monitoreo and interfaz.monitoreo.tiempo_fin:
         hora_fin = interfaz.monitoreo.tiempo_fin.strftime("%H:%M:%S")
-        print(f"⏹ MONITOREO FINALIZADO DESDE LA WEB a las {hora_fin}")
+        print(f"MONITOREO FINALIZADO DESDE LA WEB a las {hora_fin}")
     else:
         ahora = datetime.now()
         hora_fin = ahora.strftime("%H:%M:%S")
-        print(f"⏹ MONITOREO FINALIZADO DESDE LA WEB a las {hora_fin}")
-        
+        print(f"MONITOREO FINALIZADO DESDE LA WEB a las {hora_fin}")
+
     # Calcular métricas térmicas de la sesión
     if historial_temperaturas:
-        temp_inicial = historial_temperaturas[0]
+        temp_inicial = temp_inicial_sesion if temp_inicial_sesion is not None else historial_temperaturas[0]   # <-- cambiada
         temp_final = historial_temperaturas[-1]
         temp_promedio = sum(historial_temperaturas) / len(historial_temperaturas)
     else:
@@ -216,7 +225,7 @@ def api_finalizar():
 
     # Guardar los datos en SQLite
     db.guardar_tratamiento(registro_completo)
-    
+
     return jsonify({"status": "ok"})
 
 @app.route("/api/obtener_estado", methods=["GET"])
