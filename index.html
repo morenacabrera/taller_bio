@@ -328,7 +328,7 @@
             spanEstado.className = (data.conexion === "CONECTADO") ? "conectado" : "desconectado";
 
             if (data.monitoreo_activo && data.temp_actual !== null && data.temp_actual !== undefined) {
-                document.getElementById('val-temperatura').innerText = data.temp_actual.toFixed(1);
+                document.getElementById('val-temperatura').innerText = data.temp_actual.toFixed(2);
             } else {
                 document.getElementById('val-temperatura').innerText = "--.-";
             }

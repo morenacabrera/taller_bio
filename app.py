@@ -80,7 +80,7 @@ def ciclo_monitoreo():
 
                 if temp is not None:
                     temp_actual = temp
-                    print(f"Temperatura: {temp:.1f} °C", flush=True)
+                    print(f"Temperatura: {temp:.2f} °C", flush=True)
 
                     # Captura de la temperatura inicial (primera lectura tras Guardar)
                     if esperando_temp_inicial:
