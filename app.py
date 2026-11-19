@@ -24,7 +24,7 @@ alerta_fuera_rango_previa = False # Para contar cuántas veces entró en alerta
 temp_inicial_sesion = None          
 esperando_temp_inicial = False   
 
-# Variables para registrar valores únicos de temperatura que causaron alerta
+# Variables para registrar valores únicos de que causaron alerta
 temps_alerta_sesion = []
 entro_al_rango_alguna_vez = False
 
@@ -91,15 +91,17 @@ def ciclo_monitoreo():
                     en_rango = (temp_min <= temp_actual <= temp_max)
                     fuera_de_rango_ahora = not en_rango
 
-                    # Marca si ingresó al rango al menos una vez en la sesión
+                    # 1. Si la temperatura está (o entra) en rango por primera vez, activamos la bandera
                     if en_rango:
                         entro_al_rango_alguna_vez = True
 
-                    # Si ya ingresó previamente y se sale, registra valores únicos
+                    # 2. SOLO si ya tocó el rango en algún momento de la sesión y AHORA se sale,
+                    # se registran las temperaturas de alerta de ahí en adelante (sin duplicar)
                     if entro_al_rango_alguna_vez and fuera_de_rango_ahora:
                         if temp_actual not in temps_alerta_sesion:
                             temps_alerta_sesion.append(temp_actual)
 
+                    # 3. Contador de eventos/transiciones de salida de rango
                     if fuera_de_rango_ahora and not alerta_fuera_rango_previa:
                         contador_fuera_rango += 1
 
@@ -131,7 +133,7 @@ def home():
 @app.route("/api/guardar", methods=["POST"])
 def api_guardar():
     global monitoreo_activo, datos_sesion_actual, historial_temperaturas, contador_fuera_rango, contador_silenciadas, alerta_fuera_rango_previa, esperando_temp_inicial, temps_alerta_sesion, entro_al_rango_alguna_vez
-    
+
     data = request.json
     try:
         id_paciente = data.get("id_paciente", "S/D")
@@ -150,8 +152,8 @@ def api_guardar():
         contador_silenciadas = 0
         alerta_fuera_rango_previa = False
         esperando_temp_inicial = True
-        temps_alerta_sesion = []
-        entro_al_rango_alguna_vez = False
+        temps_alerta_sesion = []           # 👈 Reinicio limpio de alertas
+        entro_al_rango_alguna_vez = False  # 👈 Reinicio de bandera de 1ª vez
 
         ahora = datetime.now()
         datos_sesion_actual = {
@@ -171,7 +173,7 @@ def api_guardar():
     
     except (TypeError, ValueError) as e:
         return jsonify({"status": "error", "message": str(e)}), 400
-
+    
 @app.route("/api/silenciar", methods=["POST"])
 def api_silenciar():
     global alerta_activa, contador_silenciadas
@@ -224,7 +226,7 @@ def api_finalizar():
         'temp_promedio': round(temp_promedio, 2),
         'veces_fuera_rango': contador_fuera_rango,
         'alertas_silenciadas': contador_silenciadas,
-        'temperaturas_alerta': cadena_temps_alerta,
+        'temperatura_alerta': cadena_temps_alerta,
         'hora_inicio': datos_sesion_actual.get('hora_inicio', '00:00:00'),
         'hora_fin': hora_fin,
         'fecha': datos_sesion_actual.get('fecha', datetime.now().strftime("%Y-%m-%d"))

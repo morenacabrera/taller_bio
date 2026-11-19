@@ -10,7 +10,7 @@ class BaseDeDatos:
         return sqlite3.connect(self.nombre_db)
 
     def inicializar_base(self):
-        """Crea la tabla de tratamientos si no existe."""
+        """Crea la tabla si no existe con todas las columnas necesarias."""
         conexion = self.conectar()
         cursor = conexion.cursor()
         cursor.execute("""
@@ -26,7 +26,7 @@ class BaseDeDatos:
                 temp_promedio REAL,
                 veces_fuera_rango INTEGER,
                 alertas_silenciadas INTEGER,
-                temperaturas_alerta TEXT,
+                temperatura_alerta TEXT,  -- 👈 DEFINICIÓN DE LA COLUMNA
                 hora_inicio TEXT,
                 hora_fin TEXT,
                 fecha TEXT
@@ -34,9 +34,7 @@ class BaseDeDatos:
         """)
         conexion.commit()
         conexion.close()
-
     def guardar_tratamiento(self, datos):
-        """Inserta un registro completo del tratamiento en la base de datos."""
         conexion = self.conectar()
         cursor = conexion.cursor()
         
@@ -45,9 +43,10 @@ class BaseDeDatos:
                 id_paciente, num_sesion, num_gorro, 
                 temp_min_umbral, temp_max_umbral, 
                 temp_inicial, temp_final, temp_promedio, 
-                veces_fuera_rango, alertas_silenciadas, temperatura_alerta,
+                veces_fuera_rango, alertas_silenciadas,
+                temperatura_alerta, 
                 hora_inicio, hora_fin, fecha
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             datos.get('id_paciente'),
             datos.get('num_sesion'),
@@ -59,6 +58,8 @@ class BaseDeDatos:
             datos.get('temp_promedio'),
             datos.get('veces_fuera_rango'),
             datos.get('alertas_silenciadas'),
+            datos.get('temperatura_alerta'),
+            
             datos.get('hora_inicio'),
             datos.get('hora_fin'),
             datos.get('fecha')
@@ -66,4 +67,3 @@ class BaseDeDatos:
         
         conexion.commit()
         conexion.close()
-        print("[BD] Tratamiento guardado exitosamente en la base de datos.")
