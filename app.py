@@ -12,6 +12,11 @@ from clase_monitoreo import Monitoreo
 from flask import Flask, jsonify, render_template, request
 from clase_based_datos import BaseDeDatos
 from datetime import datetime
+import matplotlib
+matplotlib.use('Agg')  # Para generar gráficos en segundo plano sin abrir ventanas GUI
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import numpy as np
 
 db = BaseDeDatos()
 
@@ -235,7 +240,26 @@ def api_finalizar():
     # Guardar los datos en SQLite
     db.guardar_tratamiento(registro_completo)
 
-    return jsonify({"status": "ok"})
+    # Generar el gráfico automáticamente al finalizar
+    id_paciente = datos_sesion_actual.get('id_paciente', 'SD')
+    num_sesion = datos_sesion_actual.get('num_sesion', 0)
+    temp_min = datos_sesion_actual.get('temp_min', 0)
+    temp_max = datos_sesion_actual.get('temp_max', 0)
+
+    # Generar imagen para el póster
+    nombre_grafico = generar_grafico_sesion(
+        historial_temps=historial_temperaturas,
+        temp_min=temp_min,
+        temp_max=temp_max,
+        temps_alerta=temps_alerta_sesion,
+        num_sesion=num_sesion,
+        id_paciente=id_paciente
+    )
+
+    # ... (guardado en la base de datos con db.guardar_tratamiento(registro_completo)) ...
+
+    monitoreo_activo = False
+    return jsonify({"status": "ok", "grafico": nombre_grafico})
 
 @app.route("/api/obtener_estado", methods=["GET"])
 def api_obtener_estado():
@@ -247,6 +271,71 @@ def api_obtener_estado():
         "umbral_min": gestor.umbral_min,
         "umbral_max": gestor.umbral_max,
     })
+
+def generar_grafico_sesion(historial_temps, temp_min, temp_max, temps_alerta, num_sesion, id_paciente):
+    """
+    Genera y guarda el gráfico de temperatura vs tiempo para el póster académico.
+    """
+    if not historial_temps:
+        print("No hay datos de temperatura para graficar.")
+        return None
+
+    # Eje X: Convertir lecturas por segundo a minutos (0, 1/60, 2/60...)
+    tiempo_minutos = [i / 60.0 for i in range(len(historial_temps))]
+
+    # Crear la figura y los ejes
+    fig, ax = plt.subplots(figsize=(10, 5), dpi=300)
+
+    # 1. Banda horizontal sombreada para el rango terapéutico configurado
+    ax.axhspan(temp_min, temp_max, color='#2ECC71', alpha=0.18, label=f'Rango Terapéutico ({temp_min}°C - {temp_max}°C)')
+
+    # Lineas punteadas para delimitar visualmente los umbrales
+    ax.axhline(temp_min, color='#27AE60', linestyle='--', linewidth=1.2)
+    ax.axhline(temp_max, color='#27AE60', linestyle='--', linewidth=1.2)
+
+    # 2. Curva principal de temperatura (línea suave con puntos negros por segundo)
+    ax.plot(tiempo_minutos, historial_temps, color='#2C3E50', linewidth=1.5, zorder=2)
+    ax.scatter(tiempo_minutos, historial_temps, color='black', s=12, label='Lectura por segundo', zorder=3)
+
+    # 3. Marcar con puntos rojos bien definidos las temperaturas de alerta guardadas en la BD
+    alertas_x = []
+    alertas_y = []
+    
+    # Identificar las posiciones de las temperaturas en la lista de alertas
+    for t_min, temp in zip(tiempo_minutos, historial_temps):
+        if temp in temps_alerta:
+            alertas_x.append(t_min)
+            alertas_y.append(temp)
+
+    if alertas_x:
+        ax.scatter(alertas_x, alertas_y, color='#E74C3C', edgecolor='black', s=50, linewidth=0.8, label='Temperatura de Alerta', zorder=4)
+
+    # 4. Configuración de ejes y escalas
+    ax.set_ylim(0, 50)  # Eje vertical de 0 a 50°C
+    
+    # 👈 CORREGIDO AQUÍ: Genera marcas desde 0 hasta 50 cada 2.5°C (0, 2.5, 5.0 ... 47.5, 50.0)
+    ax.set_yticks(np.arange(0, 51, 2.5)) 
+    
+    # Ajuste automático del eje horizontal en minutos
+    max_minutos = max(tiempo_minutos) if tiempo_minutos else 1
+    ax.set_xlim(0, max_minutos * 1.05)
+
+    # Estilizado para el póster académico
+    ax.set_title(f"Registro Térmico de la Sesión N° {num_sesion} - Paciente: {id_paciente}", fontsize=13, fontweight='bold', pad=12)
+    ax.set_xlabel("Tiempo (minutos)", fontsize=11, labelpad=8)
+    ax.set_ylabel("Temperatura (°C)", fontsize=11, labelpad=8)
+    ax.grid(True, linestyle=':', alpha=0.6)
+    ax.legend(loc='upper right', framealpha=0.9, fontsize=9)
+
+    plt.tight_layout()
+
+    # Guardar imagen PNG con alta resolución para el póster
+    nombre_archivo = f"grafico_sesion_{num_sesion}_{id_paciente}.png"
+    plt.savefig(nombre_archivo, format='png', dpi=300)
+    plt.close()
+    
+    print(f"Grafico generado con éxito: {nombre_archivo}")
+    return nombre_archivo
 
 if __name__ == "__main__":
     puerto_web = 5000
